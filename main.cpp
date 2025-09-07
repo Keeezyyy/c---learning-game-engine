@@ -244,8 +244,14 @@ int main()
 
     World MyWorld;
 
+    MyWorld.add_block(BlockType::DIRT, 0,0,0, MyTextures.texture_map);
+    MyWorld.add_block(BlockType::DIRT, 0,0,1, MyTextures.texture_map);
+    MyWorld.add_block(BlockType::DIRT, 0,0,2, MyTextures.texture_map);
+    MyWorld.add_block(BlockType::DIRT, 0,0,3, MyTextures.texture_map);
 
-    MyWorld.load_vertecies() ;   
+    MyWorld.load_vertecies();
+    
+    printf("[Building World]size of vertecies %zu", MyWorld.vertecies.size());
 
     // VAO init
     unsigned int VAO;

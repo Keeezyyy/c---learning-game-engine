@@ -1,19 +1,28 @@
 
 
 #include "world.h"
+#include "block.h"
 
 World::World()
 {
     // Beispiel: ein paar Blöcke initialisieren
-
-
 }
+
+
 
 void World::load_vertecies()
 {
     int index = 0; // Zeiger für vertecies
 
     int numBlocks = BlocksToRender.size();
+
+    // Ensure output buffer is large enough: 6 faces * 6 vertices per face * 9 floats per vertex
+    const int facesPerBlock = 6;
+    const int verticesPerFace = 6;
+    const int floatsPerVertex = 9; // x,y,z,u,v, texId, worldX, worldY, worldZ
+    size_t requiredSize = static_cast<size_t>(numBlocks) * facesPerBlock * verticesPerFace * floatsPerVertex;
+    vertecies.clear();
+    vertecies.resize(requiredSize);
 
     for (int i = 0; i < numBlocks; i++)
     {
@@ -44,4 +53,13 @@ void World::load_vertecies()
             }
         }
     }
+}
+
+
+void World::add_block(BlockType t, int x, int y, int z, std::map<std::string, unsigned int> map){
+    Block newBlock(t, x, y, z, map);
+
+
+
+    BlocksToRender.push_back(newBlock);
 }
