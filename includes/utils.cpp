@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <vector>
+#include <stb/stb_image.h>
+
 
 char *readFile(const char *filename)
 {
@@ -36,4 +38,11 @@ char *readFile(const char *filename)
 
     fclose(file);
     return buffer;
+}
+
+u_char *readPng(const char *filename, int *out_width, int *out_height, int *out_colorCHannels)
+{
+    unsigned char *bytes = stbi_load(filename, out_width, out_height, out_colorCHannels, 0);
+
+    return bytes;
 }

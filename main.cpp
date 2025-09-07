@@ -16,219 +16,18 @@
 
 //custom includes
 #include "includes/utils.h"
-
+#include "includes/shader.h"
+#include "includes/textures.h"
+#include "includes/block.h"
+#include "includes/world.h"
 
 int screenwidth = 640;
 int screenheight = 480;
 
-enum class BlockType
-{
-    AIR,
-    GRASS,
-    DIRT,
-    STONE
-};
-
-// 2. Blockfaces
-enum class BlockFace
-{
-    Top,
-    Bottom,
-    Left,
-    Right,
-    Front,
-    Back
-};
-
-// 3. Struktur für einen Vertex
-struct Vertex
-{
-    float x, y, z; // Position
-    float u, v;    // Texturkoordinaten
-};
 
 // 4. BlockFaceData speichert 6 Vertices pro Seite
-struct BlockFaceData
-{
-    Vertex vertices[6];  // 2 Dreiecke = 6 Vertices
-    std::string texture; // Textur der Seite
-    unsigned int textureID;
-};
-
-struct vector3Int
-{
-    int x, y, z;
-};
-
-// 5. Block speichert Typ und die 6 Seiten
-struct Block
-{
-    BlockType type;
-    BlockFaceData faces[6]; // Top, Bottom, Left, Right, Front, Back
-    vector3Int wordPos;
-
-    // Initialisierung der Texturen pro Face
-    void rotateUVRight(BlockFaceData &face)
-    {
-        for (int v = 0; v < 6; v++)
-        {
-            float oldU = face.vertices[v].u;
-            float oldV = face.vertices[v].v;
-            face.vertices[v].u = oldV;
-            face.vertices[v].v = 1.0f - oldU;
-        }
-    }
-
-    // Initialisierung der Texturen pro Face
-    void init(BlockType t,
-              const std::array<std::string, 6> &textures,
-              const std::array<unsigned int, 6> &textureIds,
-              int x, int y, int z)
-    {
-        wordPos.x = x;
-        wordPos.y = y;
-        wordPos.z = z;
-        type = t;
-
-        for (int i = 0; i < 6; i++)
-        {
-            faces[i].texture = textures[i];
-            faces[i].textureID = textureIds[i];
-
-            switch (i)
-            {
-            case (int)BlockFace::Top:
-                faces[i].vertices[0] = {0, 1, 0, 0, 0};
-                faces[i].vertices[1] = {1, 1, 0, 1, 0};
-                faces[i].vertices[2] = {1, 1, 1, 1, 1};
-                faces[i].vertices[3] = {0, 1, 0, 0, 0};
-                faces[i].vertices[4] = {1, 1, 1, 1, 1};
-                faces[i].vertices[5] = {0, 1, 1, 0, 1};
-                break;
-
-            case (int)BlockFace::Bottom:
-                faces[i].vertices[0] = {0, 0, 0, 0, 0};
-                faces[i].vertices[1] = {1, 0, 1, 1, 1};
-                faces[i].vertices[2] = {1, 0, 0, 1, 0};
-                faces[i].vertices[3] = {0, 0, 0, 0, 0};
-                faces[i].vertices[4] = {0, 0, 1, 0, 1};
-                faces[i].vertices[5] = {1, 0, 1, 1, 1};
-                break;
-
-            case (int)BlockFace::Left:
-                faces[i].vertices[0] = {0, 0, 0, 0, 0};
-                faces[i].vertices[1] = {0, 1, 1, 1, 1};
-                faces[i].vertices[2] = {0, 1, 0, 1, 0};
-                faces[i].vertices[3] = {0, 0, 0, 0, 0};
-                faces[i].vertices[4] = {0, 0, 1, 0, 1};
-                faces[i].vertices[5] = {0, 1, 1, 1, 1};
-                break;
-
-            case (int)BlockFace::Right:
-                faces[i].vertices[0] = {1, 0, 0, 0, 0};
-                faces[i].vertices[1] = {1, 1, 0, 1, 0};
-                faces[i].vertices[2] = {1, 1, 1, 1, 1};
-                faces[i].vertices[3] = {1, 0, 0, 0, 0};
-                faces[i].vertices[4] = {1, 1, 1, 1, 1};
-                faces[i].vertices[5] = {1, 0, 1, 0, 1};
-                break;
-
-            case (int)BlockFace::Front:
-                faces[i].vertices[0] = {0, 0, 1, 0, 0};
-                faces[i].vertices[1] = {1, 1, 1, 1, 1};
-                faces[i].vertices[2] = {1, 0, 1, 1, 0};
-                faces[i].vertices[3] = {0, 0, 1, 0, 0};
-                faces[i].vertices[4] = {0, 1, 1, 0, 1};
-                faces[i].vertices[5] = {1, 1, 1, 1, 1};
-                break;
-
-            case (int)BlockFace::Back:
-                faces[i].vertices[0] = {0, 0, 0, 0, 0};
-                faces[i].vertices[1] = {1, 0, 0, 1, 0};
-                faces[i].vertices[2] = {1, 1, 0, 1, 1};
-                faces[i].vertices[3] = {0, 0, 0, 0, 0};
-                faces[i].vertices[4] = {1, 1, 0, 1, 1};
-                faces[i].vertices[5] = {0, 1, 0, 0, 1};
-                break;
-            }
-
-            // Nach Erzeugung: UVs rotieren
-            if (i == (int)BlockFace::Front || i == (int)BlockFace::Back)
-            {
-                rotateUVRight(faces[i]);
-                rotateUVRight(faces[i]);
-            }
-            if (i == (int)BlockFace::Right || i == (int)BlockFace::Left)
-            {
-                rotateUVRight(faces[i]);
-            }
-        }
-    }
-};
 
 
-u_char *readPng(const char *filename, int *out_width, int *out_height, int *out_colorCHannels)
-{
-    unsigned char *bytes = stbi_load(filename, out_width, out_height, out_colorCHannels, 0);
-
-    return bytes;
-}
-
-void getTexturesArray(std::map<std::string, unsigned int> &map,
-                      std::array<unsigned int, 6> *array_out,
-                      std::array<std::string, 6> &array_in)
-{
-    for (int i = 0; i < 6; i++) // Schleife bis 6, nicht 7
-    {
-        (*array_out)[i] = map[array_in[i]];
-    }
-
-    // Array ausgeben
-    std::cout << "Array: ";
-    for (int i = 0; i < 6; i++)
-    {
-        std::cout << (*array_out)[i] << " ";
-    }
-    std::cout << std::endl;
-}
-
-void fillVerticesWithBlocks(
-    float arr_out[],
-    Block *blocks,
-    int numBlocks)
-{
-    int index = 0; // Zeiger für arr_out
-
-    for (int i = 0; i < numBlocks; i++)
-    {
-        Block b = blocks[i];
-
-        for (int k = 0; k < 6; k++)
-        {
-            BlockFaceData face = b.faces[k];
-
-            for (int j = 0; j < 6; j++)
-            {
-                Vertex v = face.vertices[j];
-
-                // Vertex
-                arr_out[index++] = v.x;
-                arr_out[index++] = v.y;
-                arr_out[index++] = v.z;
-                arr_out[index++] = v.u;
-                arr_out[index++] = v.v;
-
-                // TextureId
-                arr_out[index++] = face.textureID;
-
-                // World Pos
-                arr_out[index++] = (float)b.wordPos.x;
-                arr_out[index++] = (float)b.wordPos.y;
-                arr_out[index++] = (float)b.wordPos.z;
-            }
-        }
-    }
-}
 
 struct vec3
 {
@@ -312,64 +111,6 @@ float pitch = 0.0f;
 
 Camera playerCam;
 
-void loadTextures(std::map<std::string, unsigned int> &map)
-{
-    std::cout << "loading textures ... \n";
-    std::string path = "./textures";
-
-    DIR *dir = opendir(path.c_str());
-    if (!dir)
-    {
-        std::cerr << "Ordner nicht gefunden!\n";
-        return;
-    }
-
-    int idx = 0; // Texture Unit Zähler
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != nullptr)
-    {
-        if (entry->d_type == DT_REG)
-        {
-            std::string fileName = entry->d_name;
-            std::string fullPath = path + "/" + fileName;
-
-            unsigned int texID;
-
-            glGenTextures(1, &texID);
-            glActiveTexture(GL_TEXTURE0 + idx);  // Texture Unit aktivieren
-            glBindTexture(GL_TEXTURE_2D, texID); // Textur binden
-
-            printf("loading texture : %s for the index: %u\n", entry->d_name, texID);
-
-            // Wrap / Filter Einstellungen
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-            int width, height, nrChannels;
-            unsigned char *data = readPng(fullPath.c_str(), &width, &height, &nrChannels);
-
-            if (data)
-            {
-                GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
-                glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-                glGenerateMipmap(GL_TEXTURE_2D);
-
-                map[fileName] = idx;
-            }
-            else
-            {
-                std::cerr << "Failed to load texture: " << fileName << "\n";
-            }
-
-            stbi_image_free(data);
-            idx++;
-        }
-    }
-    closedir(dir);
-    std::cout << "[finished] loading textures \n";
-}
 
 float deltaTime = 0.0f;
 
@@ -466,6 +207,8 @@ void processInput(float deltaTime)
     playerCam.cameraPos.y += direction.y * moveSpeed * deltaTime;
     playerCam.cameraPos.z += direction.z * moveSpeed * deltaTime;
 }
+
+
 int main()
 {
     glfwInit();
@@ -491,50 +234,18 @@ int main()
     glDepthFunc(GL_LESS);
 
     // Reading the shader files
-    char *vertexShaderSource = readFile("shader/vertexShader.vert"), *FragmentShaderSource = readFile("shader/vertexShader.frag");
+    Shader MyShaders;
 
-    if (!vertexShaderSource || !FragmentShaderSource)
-    {
-        std::cout << "Shader files not found!" << std::endl;
-        return -1;
-    }
-    // start width Buffer connections
+    //Textures
+    Textures MyTextures;
 
-    // Texture Map
-    std::map<std::string, unsigned int> texture_map;
-    // Textures
-
-    // loading textures
-    loadTextures(texture_map);
-
+    MyTextures.load_textures();
     // Game initialisation
 
-    Block blocks[5];
+    World MyWorld;
 
-    std::array<std::string, 6> grassTextures = {
-        "grass_top.png", "grass_top.png", "grass_side.png",
-        "grass_side.png", "grass_side.png", "grass_side.png"};
-    std::array<std::string, 6> dirtTextures = {
-        "dirt.png", "dirt.png", "dirt.png",
-        "dirt.png", "dirt.png", "dirt.png"};
 
-    std::array<unsigned int, 6> grassTextureIds;
-    std::array<unsigned int, 6> dirtTextureIds;
-
-    getTexturesArray(texture_map, &grassTextureIds, grassTextures);
-    getTexturesArray(texture_map, &dirtTextureIds, dirtTextures);
-
-    blocks[0].init(BlockType::DIRT, grassTextures, grassTextureIds, 0, -2, -1);
-    blocks[1].init(BlockType::DIRT, grassTextures, grassTextureIds, 0, -2, 0);
-    blocks[2].init(BlockType::DIRT, grassTextures, grassTextureIds, 0, -2, 1);
-    blocks[3].init(BlockType::DIRT, grassTextures, grassTextureIds, 0, -2, 2);
-    blocks[4].init(BlockType::DIRT, grassTextures, grassTextureIds, 0, -2, 3);
-
-    const int numBlocks = (sizeof(blocks) / sizeof(blocks[0])); // Anzahl der Blocks die du wirklich füllen willst
-
-    float vertecies[6 * 6 * 9 * numBlocks]; // 6 Faces, 6 Vertices pro Face, 9 floats pro Vertex
-
-    fillVerticesWithBlocks(vertecies, blocks, numBlocks);
+    MyWorld.load_vertecies() ;   
 
     // VAO init
     unsigned int VAO;
@@ -547,13 +258,13 @@ int main()
 
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertecies), vertecies, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, MyWorld.vertecies.size() * sizeof(float), MyWorld.vertecies.data(), GL_STATIC_DRAW);
     // Initiating shaders
 
     // Vertex Shader
     GLuint vertextShader;
     vertextShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertextShader, 1, &vertexShaderSource, NULL);
+    glShaderSource(vertextShader, 1, &MyShaders.VertexShaderSource, NULL);
     glCompileShader(vertextShader);
 
     // Check vertex shader compilation
@@ -570,7 +281,7 @@ int main()
     // Fragment SHader
     GLuint fragShader;
     fragShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragShader, 1, &FragmentShaderSource, NULL);
+    glShaderSource(fragShader, 1, &MyShaders.FragmentShaderSource, NULL);
     glCompileShader(fragShader);
 
     // Check fragment shader compilation
@@ -618,8 +329,8 @@ int main()
 
     float lastFrame = 0.0f; // vor dem Loop initialisieren
 
-    free(vertexShaderSource);
-    free(FragmentShaderSource);
+    free(MyShaders.VertexShaderSource);
+    free(MyShaders.FragmentShaderSource);
     while (!glfwWindowShouldClose(window))
     {
         float currentFrame = glfwGetTime();
@@ -662,7 +373,7 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36 * (sizeof(blocks) / sizeof(blocks[0])));
+        glDrawArrays(GL_TRIANGLES, 0, MyWorld.vertecies.size());
 
         glfwSwapBuffers(window);
         glfwPollEvents();
