@@ -29,7 +29,7 @@ public:
 
     bool firstMouse = true;
 
-    float yaw = -90.0f; // Initial Richtung entlang -Z
+    float yaw = 90.0f; // Initial Richtung entlang -Z
     float pitch = 0.0f;
 
     float lastX;
@@ -42,6 +42,13 @@ public:
     glm::vec3 U; // Right
     glm::vec3 N; // Up
     glm::vec3 V; // Forward
+
+
+    float sizeDown = 1.5f;
+
+
+    float JumpVelocity = 0.0f;
+    bool isJumping = false;
 
     void moveForward(float delta) { cameraPos += V * delta; }
     void moveBackward(float delta) { cameraPos -= V * delta; }
@@ -68,6 +75,10 @@ public:
     void processInput(float deltaTime);
     static void mouse_callback(GLFWwindow *window, double xpos, double ypos);
     void handleMouse(double xpos, double ypos);
+
+    float getGroundHeight(const std::vector<Block> &blocks);
+
+    void updatePhysics(float deltaTime, const std::vector<Block> &blocks);
 
     ~Camera();
 };

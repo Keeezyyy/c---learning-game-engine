@@ -23,23 +23,22 @@
 #include "includes/buffer.h"
 #include "includes/camera.h"
 
-
-int screenwidth = 640;
-int screenheight = 480;
+int screenwidth = 1280;
+int screenheight = 720;
 
 // 4. BlockFaceData speichert 6 Vertices pro Seite
 
-
-
 float deltaTime = 0.0f;
 
-
 Camera PlayerCam(screenwidth, screenheight);
-
 
 int main()
 {
     glfwInit();
+
+    PlayerCam.cameraPos.y = 10.0f;
+    PlayerCam.cameraPos.x = 5.0f;
+    PlayerCam.cameraPos.z = 5.0f;
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -72,10 +71,17 @@ int main()
 
     World MyWorld;
 
-    MyWorld.add_block(BlockType::DIRT, 0, 0, 0, MyTextures.texture_map);
-    MyWorld.add_block(BlockType::DIRT, 0, 0, 1, MyTextures.texture_map);
-    MyWorld.add_block(BlockType::DIRT, 0, 0, 2, MyTextures.texture_map);
-    MyWorld.add_block(BlockType::DIRT, 0, 0, 3, MyTextures.texture_map);
+    for (int x = 0; x < 20; x++)
+    {
+        for (int z = 0; z < 20; z++)
+        {
+            // Bodenschicht aus Dirt
+            MyWorld.add_block(BlockType::DIRT, x, 0, z, MyTextures.texture_map);
+
+            // Oberschicht aus Grass
+            MyWorld.add_block(BlockType::GRASS, x, 1, z, MyTextures.texture_map);
+        }
+    }
 
     MyWorld.load_vertecies();
 
@@ -93,8 +99,7 @@ int main()
     MyShader.fragment_shader();
     MyShader.shader_program();
 
-
-    //Vertex Interpretaion
+    // Vertex Interpretaion
     MyBuffer.VertexInterpretation();
 
     glfwSetWindowUserPointer(window, &PlayerCam); // Instanz speichern
@@ -104,7 +109,9 @@ int main()
     glfwSetKeyCallback(window, Camera::key_callback);
 
     MyShader.~Shader();
-    
+
+    auto start = std::chrono::system_clock::now();
+
     float lastFrame = 0.0f; // vor dem Loop initialisieren
     while (!glfwWindowShouldClose(window))
     {
@@ -112,8 +119,11 @@ int main()
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
+
+
         glfwPollEvents();
         PlayerCam.processInput(deltaTime);
+        PlayerCam.updatePhysics(deltaTime, MyWorld.BlocksToRender);
 
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -152,6 +162,7 @@ int main()
 
         glfwSwapBuffers(window);
         glfwPollEvents();
+
     }
 
     glDetachShader(MyShader.shaderProgram, MyShader.vertextShader);
