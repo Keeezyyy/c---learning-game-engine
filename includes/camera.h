@@ -17,6 +17,7 @@
 
 #include "block.h"
 #include "utils.h"
+#include "world.h"
 
 class Camera
 {
@@ -44,7 +45,7 @@ public:
     glm::vec3 V; // Forward
 
 
-    float sizeDown = 1.5f;
+    float sizeDown = 1.7f;
 
 
     float JumpVelocity = 0.0f;
@@ -79,6 +80,8 @@ public:
     float getGroundHeight(const std::vector<Block> &blocks);
 
     void updatePhysics(float deltaTime, const std::vector<Block> &blocks);
+
+    std::vector<Block> getNextBlockLookingAt(const std::vector<Block> &blocks, std::map<std::string, unsigned int>);
 
     ~Camera();
 };

@@ -12,5 +12,6 @@ public:
 
     void VBOgen(int size, float vertecies[]);
     void VertexInterpretation();
+    void update(int size, float *vertecies);
     ~Buffer();
 };

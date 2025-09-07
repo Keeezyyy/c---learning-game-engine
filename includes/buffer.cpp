@@ -17,17 +17,36 @@
 
 Buffer::Buffer()
 {
+    VAO = 0;
+    VBO = 0;
 }
 
 void Buffer::VBOgen(int size, float *vertecies)
 {
-    glGenVertexArrays(1, &VAO);
+    // Lösche alte VAO und VBO falls sie existieren
+    if (VAO != 0)
+    {
+        glDeleteVertexArrays(1, &VAO);
+        VAO = 0;
+    }
+    if (VBO != 0)
+    {
+        glDeleteBuffers(1, &VBO);
+        VBO = 0;
+    }
 
+    glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
 
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, size, vertecies, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, size, vertecies, GL_DYNAMIC_DRAW);
+}
+
+void Buffer::update(int size, float *vertecies)
+{
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, size, vertecies);
 }
 
 void Buffer::VertexInterpretation()

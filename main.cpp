@@ -13,6 +13,8 @@
 #include <dirent.h>
 #include <vector>
 #include <string>
+#include <thread> // for std::this_thread::sleep_for
+#include <chrono> // for std::chrono::seconds
 
 // custom includes
 #include "includes/utils.h"
@@ -112,6 +114,10 @@ int main()
 
     auto start = std::chrono::system_clock::now();
 
+    int block = 2;
+
+    bool ePressedLastFrame = false;
+
     float lastFrame = 0.0f; // vor dem Loop initialisieren
     while (!glfwWindowShouldClose(window))
     {
@@ -119,12 +125,27 @@ int main()
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-
-
         glfwPollEvents();
         PlayerCam.processInput(deltaTime);
         PlayerCam.updatePhysics(deltaTime, MyWorld.BlocksToRender);
 
+        // Nur bei Tastendruck Blöcke zu Grass ändern (z.B. mit linker Maustaste)
+        bool ePressedThisFrame = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
+
+        if (ePressedThisFrame && !ePressedLastFrame)
+        {
+            block++;
+            MyWorld.add_block(BlockType::DIRT, 5 + block, 2, 5, MyTextures.texture_map);
+            MyWorld.load_vertecies();
+            MyBuffer.VBOgen(MyWorld.vertecies.size() * sizeof(float), MyWorld.vertecies.data());
+            MyBuffer.VertexInterpretation(); // nicht vergessen!
+            printf("\n");
+            printf("[Building World]size of vertecies %zu \n", MyWorld.vertecies.size());
+            printf("\n");
+            std::this_thread::sleep_for(std::chrono::seconds(1)); // optional, aber blockiert die Loop
+        }
+
+        ePressedLastFrame = ePressedThisFrame;
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -162,7 +183,6 @@ int main()
 
         glfwSwapBuffers(window);
         glfwPollEvents();
-
     }
 
     glDetachShader(MyShader.shaderProgram, MyShader.vertextShader);

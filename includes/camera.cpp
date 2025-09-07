@@ -2,6 +2,8 @@
 #include "camera.h"
 
 #include "utils.h"
+#include "block.h"
+#include "world.h"
 
 Camera::Camera(int width, int height)
 {
@@ -64,6 +66,54 @@ void Camera::handleMouse(double xpos, double ypos)
     N = {up.x, up.y, up.z};
 }
 
+std::vector<Block> Camera::getNextBlockLookingAt(const std::vector<Block> &blocks, std::map<std::string, unsigned int> map)
+{
+    int blockLength = blocks.size();
+
+    float step = 0.5;
+    glm::vec3 dir = glm::normalize(V);
+    glm::vec3 pos = cameraPos;
+
+    std::vector<Block> tmp;
+
+    for (int i = 0; i < 10; i++)
+    {
+        pos += dir * step;
+
+        int x = (int)round(pos.x);
+        int y = (int)round(pos.y);
+        int z = (int)round(pos.z);
+
+        int f;
+
+        for (int j = 0; j < blockLength; j++)
+        {
+            const Block b = blocks[j];
+            const Block *bPtr = &blocks[j];
+
+            if ((int)b.wordPos.x == x &&
+                (int)b.wordPos.y == y &&
+                (int)b.wordPos.z == z)
+            {
+                printf("Block found at (%d, %d, %d)\n", x, y, z);
+                f = j;
+                printf("Cam at (%d, %d, %d)\n", (int)cameraPos.x, (int)cameraPos.y, (int)cameraPos.z);
+                break;
+            }
+        }
+        for (int s = 0; s < blockLength; s++)
+        {
+            if (s != f)
+            {
+                
+                tmp.push_back(blocks[s]);
+            }
+        }
+    }
+
+    return tmp;
+}
+
 // Statischer Callback
 void Camera::key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
@@ -84,7 +134,6 @@ void Camera::handleKey(int key, int scancode, int action, int mods)
             if (key == GLFW_KEY_SPACE) // hier muss key verglichen werden, nicht action
             {
                 isJumping = true;
-                printf("Jump \n");
             }
         }
         else if (action == GLFW_RELEASE)
@@ -101,7 +150,21 @@ void Camera::handleKey(int key, int scancode, int action, int mods)
 
 void Camera::processInput(float deltaTime)
 {
+
     float moveSpeed = 5.0f;
+    if (JumpVelocity && abs(JumpVelocity) < 1.2)
+    {
+        if (abs(JumpVelocity) > 1)
+        {
+
+            moveSpeed /= abs(JumpVelocity);
+        }
+    }
+
+    if (abs(JumpVelocity) > 1.2)
+    {
+        moveSpeed /= 1.2;
+    }
 
     glm::vec3 direction(0.0f);
 
@@ -126,12 +189,12 @@ void Camera::updatePhysics(float deltaTime, const std::vector<Block> &blocks)
 {
     const float gravity = -9.8f;
     const float jumpStrength = 5.0f;
-    const float playerHeight = 1.0f;    // Höhe von Fuß -> Kamera (anpassen)
+    const float playerHeight = sizeDown; // Höhe von Fuß -> Kamera (anpassen)
     const float eps = 0.001f;
 
     float groundY = getGroundHeight(blocks); // höchster Block unter Spieler (Bodenhöhe)
 
-    float footY = cameraPos.y - playerHeight;    // y der "Füße"
+    float footY = cameraPos.y - playerHeight; // y der "Füße"
     bool onGround = footY <= groundY + eps;
 
     // Sprung starten (kein nudge, nur Velocity setzen)
