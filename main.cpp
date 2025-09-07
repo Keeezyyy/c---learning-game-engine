@@ -14,6 +14,10 @@
 #include <vector>
 #include <string>
 
+//custom includes
+#include "includes/utils.h"
+
+
 int screenwidth = 640;
 int screenheight = 480;
 
@@ -64,12 +68,28 @@ struct Block
     vector3Int wordPos;
 
     // Initialisierung der Texturen pro Face
-    void init(BlockType t, const std::array<std::string, 6> &textures, const std::array<unsigned int, 6> &textureIds, int x, int y, int z)
+    void rotateUVRight(BlockFaceData &face)
+    {
+        for (int v = 0; v < 6; v++)
+        {
+            float oldU = face.vertices[v].u;
+            float oldV = face.vertices[v].v;
+            face.vertices[v].u = oldV;
+            face.vertices[v].v = 1.0f - oldU;
+        }
+    }
+
+    // Initialisierung der Texturen pro Face
+    void init(BlockType t,
+              const std::array<std::string, 6> &textures,
+              const std::array<unsigned int, 6> &textureIds,
+              int x, int y, int z)
     {
         wordPos.x = x;
         wordPos.y = y;
         wordPos.z = z;
         type = t;
+
         for (int i = 0; i < 6; i++)
         {
             faces[i].texture = textures[i];
@@ -131,41 +151,21 @@ struct Block
                 faces[i].vertices[5] = {0, 1, 0, 0, 1};
                 break;
             }
+
+            // Nach Erzeugung: UVs rotieren
+            if (i == (int)BlockFace::Front || i == (int)BlockFace::Back)
+            {
+                rotateUVRight(faces[i]);
+                rotateUVRight(faces[i]);
+            }
+            if (i == (int)BlockFace::Right || i == (int)BlockFace::Left)
+            {
+                rotateUVRight(faces[i]);
+            }
         }
     }
 };
 
-char *readFile(const char *filename)
-{
-
-    FILE *file = fopen(filename, "rb");
-
-    if (!file)
-    {
-        std::cout << "error";
-        return NULL;
-    }
-
-    fseek(file, 0, SEEK_END);
-    long length = ftell(file);
-    rewind(file);
-
-    // Speicher für Text + Nullterminator
-    char *buffer = (char *)malloc(length + 1);
-    if (!buffer)
-    {
-        fprintf(stderr, "Speicher konnte nicht reserviert werden\n");
-        fclose(file);
-        return NULL;
-    }
-
-    // Inhalt lesen
-    size_t readSize = fread(buffer, 1, length, file);
-    buffer[readSize] = '\0'; // Nullterminator anhängen
-
-    fclose(file);
-    return buffer;
-}
 
 u_char *readPng(const char *filename, int *out_width, int *out_height, int *out_colorCHannels)
 {
@@ -334,9 +334,12 @@ void loadTextures(std::map<std::string, unsigned int> &map)
             std::string fullPath = path + "/" + fileName;
 
             unsigned int texID;
+
             glGenTextures(1, &texID);
             glActiveTexture(GL_TEXTURE0 + idx);  // Texture Unit aktivieren
             glBindTexture(GL_TEXTURE_2D, texID); // Textur binden
+
+            printf("loading texture : %s for the index: %u\n", entry->d_name, texID);
 
             // Wrap / Filter Einstellungen
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -353,7 +356,7 @@ void loadTextures(std::map<std::string, unsigned int> &map)
                 glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
                 glGenerateMipmap(GL_TEXTURE_2D);
 
-                map[fileName] = texID;
+                map[fileName] = idx;
             }
             else
             {
@@ -367,6 +370,8 @@ void loadTextures(std::map<std::string, unsigned int> &map)
     closedir(dir);
     std::cout << "[finished] loading textures \n";
 }
+
+float deltaTime = 0.0f;
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos)
 {
@@ -395,6 +400,14 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
     yaw += xoffset;
     pitch += yoffset;
 
+
+    printf("\n");
+    printf("yaw : %f", yaw);
+    printf("pitch : %f", pitch);
+    printf("\n");
+
+
+
     if (pitch > 89.0f)
         pitch = 89.0f;
     if (pitch < -89.0f)
@@ -416,40 +429,43 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
     playerCam.N = {up.x, up.y, up.z};
 }
 
+glm::vec3 velocity(0.0f); // global oder als Member der Kamera
+
+bool keys[1024] = {false};
+
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
-    const float speed = 0.5f; // Geschwindigkeit der Bewegung
-
-    if (action == GLFW_PRESS || action == GLFW_REPEAT) // Reagiere auch auf gehaltene Taste
+    if (key >= 0 && key < 1024)
     {
-        switch (key)
-        {
-        case GLFW_KEY_W:
-            playerCam.cameraPos.z -= speed; // Vorwärts
-            break;
-        case GLFW_KEY_S:
-            playerCam.cameraPos.z += speed; // Rückwärts
-            break;
-        case GLFW_KEY_A:
-            playerCam.cameraPos.x -= speed; // Nach links
-            break;
-        case GLFW_KEY_D:
-            playerCam.cameraPos.x += speed; // Nach rechts
-            break;
-        case GLFW_KEY_SPACE:
-            playerCam.cameraPos.y += speed; // Hochspringen
-            break;
-        case GLFW_KEY_LEFT_SHIFT:
-            playerCam.cameraPos.y -= speed; // Hochspringen
-            break;
-        default:
-            break;
-        }
-        printf("Neue Position: x=%.2f, y=%.2f, z=%.2f\n",
-               playerCam.cameraPos.x, playerCam.cameraPos.y, playerCam.cameraPos.z);
+        if (action == GLFW_PRESS)
+            keys[key] = true;
+        else if (action == GLFW_RELEASE)
+            keys[key] = false;
     }
 }
 
+void processInput(float deltaTime)
+{
+    float moveSpeed = 5.0f;
+
+    glm::vec3 direction(0.0f);
+
+    if (keys[GLFW_KEY_W])
+        direction += glm::vec3(playerCam.V.x, playerCam.V.y, playerCam.V.z);
+    if (keys[GLFW_KEY_S])
+        direction -= glm::vec3(playerCam.V.x, playerCam.V.y, playerCam.V.z);
+    if (keys[GLFW_KEY_A])
+        direction -= glm::vec3(playerCam.U.x, playerCam.U.y, playerCam.U.z);
+    if (keys[GLFW_KEY_D])
+        direction += glm::vec3(playerCam.U.x, playerCam.U.y, playerCam.U.z);
+
+    if (glm::length(direction) > 0.0f)
+        direction = glm::normalize(direction);
+
+    playerCam.cameraPos.x += direction.x * moveSpeed * deltaTime;
+    playerCam.cameraPos.y += direction.y * moveSpeed * deltaTime;
+    playerCam.cameraPos.z += direction.z * moveSpeed * deltaTime;
+}
 int main()
 {
     glfwInit();
@@ -493,22 +509,32 @@ int main()
 
     // Game initialisation
 
-    Block dirtBlock;
+    Block blocks[5];
 
     std::array<std::string, 6> grassTextures = {
-        "grass_top.png", "grass_top.png", "grass_top.png",
-        "grass_top.png", "grass_side.png", "grass_side.png"};
+        "grass_top.png", "grass_top.png", "grass_side.png",
+        "grass_side.png", "grass_side.png", "grass_side.png"};
+    std::array<std::string, 6> dirtTextures = {
+        "dirt.png", "dirt.png", "dirt.png",
+        "dirt.png", "dirt.png", "dirt.png"};
 
     std::array<unsigned int, 6> grassTextureIds;
+    std::array<unsigned int, 6> dirtTextureIds;
 
     getTexturesArray(texture_map, &grassTextureIds, grassTextures);
+    getTexturesArray(texture_map, &dirtTextureIds, dirtTextures);
 
-    dirtBlock.init(BlockType::DIRT, grassTextures, grassTextureIds, 0, -2, -1);
+    blocks[0].init(BlockType::DIRT, grassTextures, grassTextureIds, 0, -2, -1);
+    blocks[1].init(BlockType::DIRT, grassTextures, grassTextureIds, 0, -2, 0);
+    blocks[2].init(BlockType::DIRT, grassTextures, grassTextureIds, 0, -2, 1);
+    blocks[3].init(BlockType::DIRT, grassTextures, grassTextureIds, 0, -2, 2);
+    blocks[4].init(BlockType::DIRT, grassTextures, grassTextureIds, 0, -2, 3);
 
-    float vertecies[6 * 6 * 9 * 1]; // 6 Faces, 6 Vertices pro Face, 9 floats pro Vertex
+    const int numBlocks = (sizeof(blocks) / sizeof(blocks[0])); // Anzahl der Blocks die du wirklich füllen willst
 
-    Block blocks[1] = {dirtBlock};
-    fillVerticesWithBlocks(vertecies, blocks, 1);
+    float vertecies[6 * 6 * 9 * numBlocks]; // 6 Faces, 6 Vertices pro Face, 9 floats pro Vertex
+
+    fillVerticesWithBlocks(vertecies, blocks, numBlocks);
 
     // VAO init
     unsigned int VAO;
@@ -590,10 +616,19 @@ int main()
 
     glfwSetKeyCallback(window, key_callback);
 
+    float lastFrame = 0.0f; // vor dem Loop initialisieren
+
     free(vertexShaderSource);
     free(FragmentShaderSource);
     while (!glfwWindowShouldClose(window))
     {
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        glfwPollEvents();
+        processInput(deltaTime);
+
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -617,7 +652,8 @@ int main()
         glUseProgram(shaderProgram);
 
         int samplers[16];
-        for (int i = 0; i < 16; i++) samplers[i] = i; // [0,1,2,...,15]
+        for (int i = 0; i < 16; i++)
+            samplers[i] = i; // [0,1,2,...,15]
         glUniform1iv(glGetUniformLocation(shaderProgram, "ourTexture"), 16, samplers);
 
         // Matrizen an den Shader senden
@@ -626,7 +662,7 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glDrawArrays(GL_TRIANGLES, 0, 36 * (sizeof(blocks) / sizeof(blocks[0])));
 
         glfwSwapBuffers(window);
         glfwPollEvents();
