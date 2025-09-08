@@ -15,7 +15,7 @@
 #include <string>
 #include <thread> // for std::this_thread::sleep_for
 #include <chrono> // for std::chrono::seconds
-
+#include <optional>
 // custom includes
 #include "includes/utils.h"
 #include "includes/shader.h"
@@ -25,8 +25,8 @@
 #include "includes/buffer.h"
 #include "includes/camera.h"
 
-int screenwidth = 1280;
-int screenheight = 720;
+int screenwidth = 680;
+int screenheight = 480;
 
 // 4. BlockFaceData speichert 6 Vertices pro Seite
 
@@ -84,6 +84,9 @@ int main()
             MyWorld.add_block(BlockType::GRASS, x, 1, z, MyTextures.texture_map);
         }
     }
+    
+    MyWorld.add_block(BlockType::DIRT, 5, 3, 5, MyTextures.texture_map);
+    MyWorld.add_block(BlockType::DIRT, 6, 6, 7, MyTextures.texture_map);
 
     MyWorld.load_vertecies();
 
@@ -112,38 +115,36 @@ int main()
 
     MyShader.~Shader();
 
-    auto start = std::chrono::system_clock::now();
-
-    int block = 2;
-
     bool ePressedLastFrame = false;
 
     float lastFrame = 0.0f; // vor dem Loop initialisieren
     while (!glfwWindowShouldClose(window))
     {
+
+        PlayerCam.blocks = MyWorld.BlocksToRender;
+
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
         glfwPollEvents();
         PlayerCam.processInput(deltaTime);
-        PlayerCam.updatePhysics(deltaTime, MyWorld.BlocksToRender);
+        PlayerCam.updatePhysics(deltaTime);
 
         // Nur bei Tastendruck Blöcke zu Grass ändern (z.B. mit linker Maustaste)
         bool ePressedThisFrame = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
 
-        if (ePressedThisFrame && !ePressedLastFrame)
+        PlayerCam.getNextBlockLookingAt();
+        glm::vec3 tmp = PlayerCam.place_block();
+
+        if (tmp.x != 0.989f && tmp.y != 0.989f && tmp.z != 0.989f)
         {
-            block++;
-            MyWorld.add_block(BlockType::DIRT, 5 + block, 2, 5, MyTextures.texture_map);
-            MyWorld.load_vertecies();
-            MyBuffer.VBOgen(MyWorld.vertecies.size() * sizeof(float), MyWorld.vertecies.data());
-            MyBuffer.VertexInterpretation(); // nicht vergessen!
-            printf("\n");
-            printf("[Building World]size of vertecies %zu \n", MyWorld.vertecies.size());
-            printf("\n");
-            std::this_thread::sleep_for(std::chrono::seconds(1)); // optional, aber blockiert die Loop
+            MyWorld.add_block(BlockType::DIRT, tmp.x, tmp.y, tmp.z, MyTextures.texture_map);
         }
+
+        MyWorld.load_vertecies();
+        MyBuffer.VBOgen(MyWorld.vertecies.size() * sizeof(float), MyWorld.vertecies.data());
+        MyBuffer.VertexInterpretation(); // nicht vergessen!
 
         ePressedLastFrame = ePressedThisFrame;
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);

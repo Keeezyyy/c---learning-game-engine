@@ -1,3 +1,4 @@
+#include <optional>
 
 #include "camera.h"
 
@@ -66,52 +67,167 @@ void Camera::handleMouse(double xpos, double ypos)
     N = {up.x, up.y, up.z};
 }
 
-std::vector<Block> Camera::getNextBlockLookingAt(const std::vector<Block> &blocks, std::map<std::string, unsigned int> map)
+glm::vec3 Camera::place_block()
 {
-    int blockLength = blocks.size();
+    glm::vec3 out;
 
-    float step = 0.5;
-    glm::vec3 dir = glm::normalize(V);
-    glm::vec3 pos = cameraPos;
+    out.x = 0.989;
+    out.y = 0.989;
+    out.z = 0.989;
 
-    std::vector<Block> tmp;
-
-    for (int i = 0; i < 10; i++)
+    auto now = std::chrono::high_resolution_clock::now();
+    if (keys[GLFW_KEY_1] && abs(std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTimePlacedBlock).count()) > 200)
     {
-        pos += dir * step;
 
-        int x = (int)round(pos.x);
-        int y = (int)round(pos.y);
-        int z = (int)round(pos.z);
-
-        int f;
-
-        for (int j = 0; j < blockLength; j++)
+        switch (looking_at_face)
         {
-            const Block b = blocks[j];
-            const Block *bPtr = &blocks[j];
+        case BlockFace::Top:
+            out.x = looking_at_coord.x;
+            out.y = looking_at_coord.y + 1;
+            out.z = looking_at_coord.z;
+            break;
 
-            if ((int)b.wordPos.x == x &&
-                (int)b.wordPos.y == y &&
-                (int)b.wordPos.z == z)
-            {
-                printf("Block found at (%d, %d, %d)\n", x, y, z);
-                f = j;
-                printf("Cam at (%d, %d, %d)\n", (int)cameraPos.x, (int)cameraPos.y, (int)cameraPos.z);
-                break;
-            }
-        }
-        for (int s = 0; s < blockLength; s++)
-        {
-            if (s != f)
-            {
-                
-                tmp.push_back(blocks[s]);
-            }
+        case BlockFace::Bottom:
+            out.x = looking_at_coord.x;
+            out.y = looking_at_coord.y - 1;
+            out.z = looking_at_coord.z;
+            break;
+
+        case BlockFace::Left:
+            out.x = looking_at_coord.x - 1;
+            out.y = looking_at_coord.y;
+            out.z = looking_at_coord.z;
+            break;
+
+        case BlockFace::Right:
+            out.x = looking_at_coord.x + 1;
+            out.y = looking_at_coord.y;
+            out.z = looking_at_coord.z;
+            break;
+
+        case BlockFace::Front:
+            out.x = looking_at_coord.x;
+            out.y = looking_at_coord.y;
+            out.z = looking_at_coord.z + 1;
+            break;
+
+        case BlockFace::Back:
+            out.x = looking_at_coord.x;
+            out.y = looking_at_coord.y;
+            out.z = looking_at_coord.z - 1;
+            break;
+
+        default:
+            break;
         }
     }
 
-    return tmp;
+    return out;
+}
+
+const char *Camera::faceToString(BlockFace f)
+{
+    switch (f)
+    {
+    case BlockFace::Left:
+        return "Left";
+    case BlockFace::Right:
+        return "Right";
+    case BlockFace::Top:
+        return "Top";
+    case BlockFace::Bottom:
+        return "Bottom";
+    case BlockFace::Front:
+        return "Front";
+    case BlockFace::Back:
+        return "Back";
+    default:
+        return "Unknown";
+    }
+}
+
+// Verbesserter Raycasting-Algorithmus (3D DDA) für Blockauswahl und Face-Erkennung
+void Camera::getNextBlockLookingAt()
+{
+    // Maximale Reichweite des Raycasts
+    const float maxDistance = 10.0f;
+    const float epsilon = 1e-4f;
+
+    glm::vec3 rayOrigin = cameraPos;
+    glm::vec3 rayDir = glm::normalize(V);
+
+    // Startposition im Blockgitter (ganzzahlig)
+    glm::ivec3 blockPos = glm::floor(rayOrigin);
+
+    // Schrittweite in jede Richtung
+    glm::ivec3 step;
+    step.x = (rayDir.x > 0) ? 1 : (rayDir.x < 0 ? -1 : 0);
+    step.y = (rayDir.y > 0) ? 1 : (rayDir.y < 0 ? -1 : 0);
+    step.z = (rayDir.z > 0) ? 1 : (rayDir.z < 0 ? -1 : 0);
+
+    // tMax: Abstand bis zur nächsten Blockkante in jeder Achse
+    glm::vec3 tMax;
+    glm::vec3 tDelta;
+
+    for (int i = 0; i < 3; ++i) {
+        if (rayDir[i] != 0.0f) {
+            float nextBoundary = (step[i] > 0) ? (blockPos[i] + 1.0f) : (blockPos[i]);
+            tMax[i] = (nextBoundary - rayOrigin[i]) / rayDir[i];
+            tDelta[i] = 1.0f / std::abs(rayDir[i]);
+        } else {
+            tMax[i] = std::numeric_limits<float>::infinity();
+            tDelta[i] = std::numeric_limits<float>::infinity();
+        }
+    }
+
+    float distanceTravelled = 0.0f;
+    BlockFace lastFace = BlockFace::Front; // Default, wird überschrieben
+
+    // Hilfsfunktion: Prüft, ob ein Block an blockPos existiert
+    auto blockExists = [&](const glm::ivec3& pos) -> const Block* {
+        for (const Block& b : blocks) {
+            glm::ivec3 bpos = glm::ivec3(b.wordPos.x, b.wordPos.y, b.wordPos.z);
+            if (bpos == pos)
+                return &b;
+        }
+        return nullptr;
+    };
+
+    while (distanceTravelled < maxDistance) {
+        // Block an aktueller Position?
+        const Block* hitBlock = blockExists(blockPos);
+        if (hitBlock) {
+            // Treffer! Face bestimmen anhand der zuletzt überschrittenen Achse
+            looking_at_coord = glm::vec3(blockPos);
+            looking_at_face = lastFace;
+
+            printf("Looking at block (%d, %d, %d), face: %s\n",
+                   blockPos.x, blockPos.y, blockPos.z, faceToString(lastFace));
+            return;
+        }
+
+        // Nächste Achse bestimmen, die überschritten wird
+        if (tMax.x < tMax.y && tMax.x < tMax.z) {
+            blockPos.x += step.x;
+            distanceTravelled = tMax.x;
+            tMax.x += tDelta.x;
+            lastFace = (step.x > 0) ? BlockFace::Left : BlockFace::Right;
+        } else if (tMax.y < tMax.z) {
+            blockPos.y += step.y;
+            distanceTravelled = tMax.y;
+            tMax.y += tDelta.y;
+            lastFace = (step.y > 0) ? BlockFace::Bottom : BlockFace::Top;
+        } else {
+            blockPos.z += step.z;
+            distanceTravelled = tMax.z;
+            tMax.z += tDelta.z;
+            lastFace = (step.z > 0) ? BlockFace::Back : BlockFace::Front;
+        }
+    }
+
+    // Kein Block getroffen
+    looking_at_face = BlockFace::Front;
+    looking_at_coord = glm::vec3(0.989f, 0.989f, 0.989f);
 }
 
 // Statischer Callback
@@ -185,14 +301,14 @@ void Camera::processInput(float deltaTime)
     cameraPos.z += direction.z * moveSpeed * deltaTime;
 }
 
-void Camera::updatePhysics(float deltaTime, const std::vector<Block> &blocks)
+void Camera::updatePhysics(float deltaTime)
 {
     const float gravity = -9.8f;
     const float jumpStrength = 5.0f;
     const float playerHeight = sizeDown; // Höhe von Fuß -> Kamera (anpassen)
     const float eps = 0.001f;
 
-    float groundY = getGroundHeight(blocks); // höchster Block unter Spieler (Bodenhöhe)
+    float groundY = getGroundHeight(); // höchster Block unter Spieler (Bodenhöhe)
 
     float footY = cameraPos.y - playerHeight; // y der "Füße"
     bool onGround = footY <= groundY + eps;
@@ -233,7 +349,7 @@ void Camera::updatePhysics(float deltaTime, const std::vector<Block> &blocks)
     }
 }
 
-float Camera::getGroundHeight(const std::vector<Block> &blocks)
+float Camera::getGroundHeight()
 {
     float groundY = 0.0f; // Standard-Bodenhöhe
 

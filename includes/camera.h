@@ -14,6 +14,9 @@
 #include <dirent.h>
 #include <vector>
 #include <string>
+#include <optional>
+#include <chrono>
+
 
 #include "block.h"
 #include "utils.h"
@@ -44,12 +47,17 @@ public:
     glm::vec3 N; // Up
     glm::vec3 V; // Forward
 
+    glm::vec3 looking_at_coord; // Forward
+    BlockFace looking_at_face;
+
+    std::vector<Block> blocks;
 
     float sizeDown = 1.7f;
 
-
     float JumpVelocity = 0.0f;
     bool isJumping = false;
+
+    std::chrono::time_point<std::chrono::high_resolution_clock> lastTimePlacedBlock;
 
     void moveForward(float delta) { cameraPos += V * delta; }
     void moveBackward(float delta) { cameraPos -= V * delta; }
@@ -77,11 +85,15 @@ public:
     static void mouse_callback(GLFWwindow *window, double xpos, double ypos);
     void handleMouse(double xpos, double ypos);
 
-    float getGroundHeight(const std::vector<Block> &blocks);
+    float getGroundHeight();
 
-    void updatePhysics(float deltaTime, const std::vector<Block> &blocks);
+    void updatePhysics(float deltaTime);
 
-    std::vector<Block> getNextBlockLookingAt(const std::vector<Block> &blocks, std::map<std::string, unsigned int>);
+    void getNextBlockLookingAt();
+
+    const char *faceToString(BlockFace);
+
+    glm::vec3 place_block();
 
     ~Camera();
 };
