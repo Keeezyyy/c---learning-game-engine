@@ -9,7 +9,8 @@ enum class BlockType
     AIR,
     GRASS,
     DIRT,
-    STONE
+    STONE,
+    SPRUCE_LOG
 };
 
 // 2. Blockfaces

@@ -15,4 +15,5 @@ public:
     void load_vertecies();
 
     void add_block(BlockType t, int x, int y, int z, std::map<std::string, unsigned int>);
+    void remove_block(int x, int y, int z);
 };

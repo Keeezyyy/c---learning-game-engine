@@ -67,7 +67,16 @@ void Camera::handleMouse(double xpos, double ypos)
     N = {up.x, up.y, up.z};
 }
 
-glm::vec3 Camera::place_block()
+// int == 0 -> destroy;
+// int == 1 -> place;
+// int == 2 -> nothing;
+struct interact_with_block_res
+{
+    glm::vec3 pos;
+    uint8_t action;
+};
+
+void Camera::interact_with_block(glm::vec3 *outVec, int *outInt)
 {
     glm::vec3 out;
 
@@ -75,10 +84,13 @@ glm::vec3 Camera::place_block()
     out.y = 0.989;
     out.z = 0.989;
 
+    int resInt = -1;
+
     auto now = std::chrono::high_resolution_clock::now();
+
     if (keys[GLFW_KEY_1] && abs(std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTimePlacedBlock).count()) > 200)
     {
-
+        resInt = 1;
         switch (looking_at_face)
         {
         case BlockFace::Top:
@@ -120,9 +132,24 @@ glm::vec3 Camera::place_block()
         default:
             break;
         }
+
+        lastTimePlacedBlock = now;
     }
 
-    return out;
+    if (keys[GLFW_KEY_2] && abs(std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTimePlacedBlock).count()) > 200)
+    {
+        std::cout << "removing block" << std::endl;
+        printf("removing blocks \n");
+        resInt = 0;
+
+        out.x = looking_at_coord.x;
+        out.y = looking_at_coord.y;
+        out.z = looking_at_coord.z;
+
+        lastTimePlacedBlock = now;
+    }
+    *outVec = out;
+    *outInt = resInt;
 }
 
 const char *Camera::faceToString(BlockFace f)
@@ -169,12 +196,16 @@ void Camera::getNextBlockLookingAt()
     glm::vec3 tMax;
     glm::vec3 tDelta;
 
-    for (int i = 0; i < 3; ++i) {
-        if (rayDir[i] != 0.0f) {
+    for (int i = 0; i < 3; ++i)
+    {
+        if (rayDir[i] != 0.0f)
+        {
             float nextBoundary = (step[i] > 0) ? (blockPos[i] + 1.0f) : (blockPos[i]);
             tMax[i] = (nextBoundary - rayOrigin[i]) / rayDir[i];
             tDelta[i] = 1.0f / std::abs(rayDir[i]);
-        } else {
+        }
+        else
+        {
             tMax[i] = std::numeric_limits<float>::infinity();
             tDelta[i] = std::numeric_limits<float>::infinity();
         }
@@ -184,8 +215,10 @@ void Camera::getNextBlockLookingAt()
     BlockFace lastFace = BlockFace::Front; // Default, wird überschrieben
 
     // Hilfsfunktion: Prüft, ob ein Block an blockPos existiert
-    auto blockExists = [&](const glm::ivec3& pos) -> const Block* {
-        for (const Block& b : blocks) {
+    auto blockExists = [&](const glm::ivec3 &pos) -> const Block *
+    {
+        for (const Block &b : blocks)
+        {
             glm::ivec3 bpos = glm::ivec3(b.wordPos.x, b.wordPos.y, b.wordPos.z);
             if (bpos == pos)
                 return &b;
@@ -193,31 +226,38 @@ void Camera::getNextBlockLookingAt()
         return nullptr;
     };
 
-    while (distanceTravelled < maxDistance) {
+    while (distanceTravelled < maxDistance)
+    {
         // Block an aktueller Position?
-        const Block* hitBlock = blockExists(blockPos);
-        if (hitBlock) {
+        const Block *hitBlock = blockExists(blockPos);
+        if (hitBlock)
+        {
             // Treffer! Face bestimmen anhand der zuletzt überschrittenen Achse
             looking_at_coord = glm::vec3(blockPos);
             looking_at_face = lastFace;
 
-            printf("Looking at block (%d, %d, %d), face: %s\n",
-                   blockPos.x, blockPos.y, blockPos.z, faceToString(lastFace));
+            // printf("Looking at block (%d, %d, %d), face: %s\n",
+            //      blockPos.x, blockPos.y, blockPos.z, faceToString(lastFace));
             return;
         }
 
         // Nächste Achse bestimmen, die überschritten wird
-        if (tMax.x < tMax.y && tMax.x < tMax.z) {
+        if (tMax.x < tMax.y && tMax.x < tMax.z)
+        {
             blockPos.x += step.x;
             distanceTravelled = tMax.x;
             tMax.x += tDelta.x;
             lastFace = (step.x > 0) ? BlockFace::Left : BlockFace::Right;
-        } else if (tMax.y < tMax.z) {
+        }
+        else if (tMax.y < tMax.z)
+        {
             blockPos.y += step.y;
             distanceTravelled = tMax.y;
             tMax.y += tDelta.y;
             lastFace = (step.y > 0) ? BlockFace::Bottom : BlockFace::Top;
-        } else {
+        }
+        else
+        {
             blockPos.z += step.z;
             distanceTravelled = tMax.z;
             tMax.z += tDelta.z;
@@ -296,9 +336,135 @@ void Camera::processInput(float deltaTime)
     if (glm::length(direction) > 0.0f)
         direction = glm::normalize(direction);
 
-    cameraPos.x += direction.x * moveSpeed * deltaTime;
+    glm::vec3 newPos;
+    glm::vec3 newCorrectedPos;
 
-    cameraPos.z += direction.z * moveSpeed * deltaTime;
+    newPos.x = cameraPos.x + direction.x * moveSpeed * deltaTime;
+    // vec2 .y == z weil Vec2
+    newPos.z = cameraPos.z + direction.z * moveSpeed * deltaTime;
+
+    newPos.y = cameraPos.y;
+
+    // Camera::checkForBlockFacing();
+    //  printf("camera pos : x: %f  z: %f , y: %f\n", cameraPos.x, cameraPos.z, cameraPos.y);
+
+    newCorrectedPos = Camera::resolveCollision(newPos, glm::vec3(cameraPos.x, cameraPos.y, cameraPos.z));
+
+    cameraPos.x = newCorrectedPos.x;
+
+    cameraPos.z = newCorrectedPos.z;
+}
+glm::vec3 Camera::resolveCollision(glm::vec3 desiredPos, glm::vec3 oldPos)
+{
+    glm::vec3 corrected = desiredPos;
+
+    // Spieler Bounding Box
+    float halfWidth = 0.3f;
+    float height = 1.8f;
+
+    for (const Block &b : blocks)
+    {
+        glm::vec3 blockMin(b.wordPos.x, b.wordPos.y, b.wordPos.z);
+        glm::vec3 blockMax = blockMin + glm::vec3(1.0f);
+
+        // Spieler-Bounding Box
+        glm::vec3 playerMin(corrected.x - halfWidth, corrected.y - sizeDown, corrected.z - halfWidth);
+        glm::vec3 playerMax(corrected.x + halfWidth, corrected.y + height, corrected.z + halfWidth);
+
+        // Check Overlap
+        bool overlapX = playerMax.x > blockMin.x && playerMin.x < blockMax.x;
+        bool overlapY = playerMax.y > blockMin.y && playerMin.y < blockMax.y;
+        bool overlapZ = playerMax.z > blockMin.z && playerMin.z < blockMax.z;
+
+        if (overlapX && overlapY && overlapZ)
+        {
+            // Korrektur nur auf der Achse, die minimal überschneidet
+            float pushLeft = blockMin.x - playerMax.x;
+            float pushRight = blockMax.x - playerMin.x;
+            float pushDown = blockMin.y - playerMax.y;
+            float pushUp = blockMax.y - playerMin.y;
+            float pushBack = blockMin.z - playerMax.z;
+            float pushFront = blockMax.z - playerMin.z;
+
+            float minPush = std::numeric_limits<float>::max();
+            glm::vec3 correction(0);
+
+            if (std::abs(pushLeft) < minPush)
+            {
+                minPush = std::abs(pushLeft);
+                correction.x = pushLeft;
+            }
+            if (std::abs(pushRight) < minPush)
+            {
+                minPush = std::abs(pushRight);
+                correction.x = pushRight;
+            }
+            if (std::abs(pushDown) < minPush)
+            {
+                minPush = std::abs(pushDown);
+                correction.y = pushDown;
+            }
+            if (std::abs(pushUp) < minPush)
+            {
+                minPush = std::abs(pushUp);
+                correction.y = pushUp;
+            }
+            if (std::abs(pushBack) < minPush)
+            {
+                minPush = std::abs(pushBack);
+                correction.z = pushBack;
+            }
+            if (std::abs(pushFront) < minPush)
+            {
+                minPush = std::abs(pushFront);
+                correction.z = pushFront;
+            }
+
+            corrected += correction;
+        }
+    }
+    return corrected;
+}
+
+void Camera::checkForBlockFacing()
+{
+    float groundY = 0.0f;
+
+    // Spieler AABB
+    float playerMinX = cameraPos.x - 0.3f;
+    float playerMaxX = cameraPos.x + 0.3f;
+    float playerMinY = cameraPos.y - sizeDown;
+    float playerMaxY = cameraPos.y + 1.8f; // bspw. Spielerhöhe
+    float playerMinZ = cameraPos.z - 0.3f;
+    float playerMaxZ = cameraPos.z + 0.3f;
+
+    for (const Block &b : blocks)
+    {
+        // Block AABB
+        float blockMinX = b.wordPos.x;
+        float blockMaxX = b.wordPos.x + 1.0f;
+        float blockMinY = b.wordPos.y;
+        float blockMaxY = b.wordPos.y + 1.0f;
+        float blockMinZ = b.wordPos.z;
+        float blockMaxZ = b.wordPos.z + 1.0f;
+
+        // Prüfen ob Spieler AABB und Block AABB sich überschneiden
+        bool intersectX = playerMaxX > blockMinX && playerMinX < blockMaxX;
+        bool intersectY = playerMaxY > blockMinY && playerMinY < blockMaxY;
+        bool intersectZ = playerMaxZ > blockMinZ && playerMinZ < blockMaxZ;
+
+        if (intersectX && intersectY && intersectZ)
+        {
+            printf("Spieler steht im oder direkt an Block bei: x: %d  y: %d  z: %d\n",
+                   b.wordPos.x, b.wordPos.y, b.wordPos.z);
+
+            // Bodenhöhe aktualisieren
+            if (groundY < blockMaxY)
+            {
+                groundY = blockMaxY;
+            }
+        }
+    }
 }
 
 void Camera::updatePhysics(float deltaTime)
@@ -361,13 +527,17 @@ float Camera::getGroundHeight()
         int x = (int)b.wordPos.x;
         int z = (int)b.wordPos.z;
 
-        if ((int)cameraPos.x == x && (int)cameraPos.z == z)
+        if (blockTop < cameraPos.y - 1.6f)
         {
 
-            if (groundY < blockTop)
+            if ((int)cameraPos.x == x && (int)cameraPos.z == z)
             {
 
-                groundY = blockTop;
+                if (groundY < blockTop)
+                {
+
+                    groundY = blockTop;
+                }
             }
         }
     }

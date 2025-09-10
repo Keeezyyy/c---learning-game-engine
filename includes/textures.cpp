@@ -46,10 +46,13 @@ void Textures::load_textures()
 
             printf("loading texture : %s for the index: %u\n", entry->d_name, texID);
 
+            // Scharfe Pixel (keine Interpolation)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+            // Wiederholen in beide Richtungen (S = X, T = Y)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
             int width, height, nrChannels;
             unsigned char *data = readPng(fullPath.c_str(), &width, &height, &nrChannels);

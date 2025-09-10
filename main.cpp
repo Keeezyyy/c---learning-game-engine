@@ -25,8 +25,8 @@
 #include "includes/buffer.h"
 #include "includes/camera.h"
 
-int screenwidth = 680;
-int screenheight = 480;
+int screenwidth = 1280;
+int screenheight = 720;
 
 // 4. BlockFaceData speichert 6 Vertices pro Seite
 
@@ -84,9 +84,9 @@ int main()
             MyWorld.add_block(BlockType::GRASS, x, 1, z, MyTextures.texture_map);
         }
     }
-    
-    MyWorld.add_block(BlockType::DIRT, 5, 3, 5, MyTextures.texture_map);
-    MyWorld.add_block(BlockType::DIRT, 6, 6, 7, MyTextures.texture_map);
+
+    MyWorld.add_block(BlockType::SPRUCE_LOG, 5, 2, 5, MyTextures.texture_map);
+    MyWorld.add_block(BlockType::SPRUCE_LOG, 5, 3, 5, MyTextures.texture_map);
 
     MyWorld.load_vertecies();
 
@@ -122,6 +122,31 @@ int main()
     {
 
         PlayerCam.blocks = MyWorld.BlocksToRender;
+        PlayerCam.getNextBlockLookingAt();
+
+        // interact with Block logic
+        // int == 0 -> destroy;
+        // int == 1 -> place;
+        // int == 2 -> nothing;
+        int interact_action;
+        glm::vec3 interact_pos;
+        PlayerCam.interact_with_block(&interact_pos, &interact_action);
+
+        if (interact_action != -1)
+        {
+            if (interact_action == 1)
+            {
+                MyWorld.add_block(BlockType::DIRT, interact_pos.x, interact_pos.y, interact_pos.z, MyTextures.texture_map);
+            }
+            if (interact_action == 0)
+            {
+                printf("removing blocks");
+                MyWorld.remove_block(interact_pos.x, interact_pos.y, interact_pos.z);
+            }
+            MyWorld.load_vertecies();
+            MyBuffer.VBOgen(MyWorld.vertecies.size() * sizeof(float), MyWorld.vertecies.data());
+            MyBuffer.VertexInterpretation(); // nicht vergessen!
+        }
 
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -133,18 +158,6 @@ int main()
 
         // Nur bei Tastendruck Blöcke zu Grass ändern (z.B. mit linker Maustaste)
         bool ePressedThisFrame = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
-
-        PlayerCam.getNextBlockLookingAt();
-        glm::vec3 tmp = PlayerCam.place_block();
-
-        if (tmp.x != 0.989f && tmp.y != 0.989f && tmp.z != 0.989f)
-        {
-            MyWorld.add_block(BlockType::DIRT, tmp.x, tmp.y, tmp.z, MyTextures.texture_map);
-        }
-
-        MyWorld.load_vertecies();
-        MyBuffer.VBOgen(MyWorld.vertecies.size() * sizeof(float), MyWorld.vertecies.data());
-        MyBuffer.VertexInterpretation(); // nicht vergessen!
 
         ePressedLastFrame = ePressedThisFrame;
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);

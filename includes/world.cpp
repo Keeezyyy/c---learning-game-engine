@@ -8,8 +8,6 @@ World::World()
     // Beispiel: ein paar Blöcke initialisieren
 }
 
-
-
 void World::load_vertecies()
 {
     int index = 0; // Zeiger für vertecies
@@ -55,11 +53,41 @@ void World::load_vertecies()
     }
 }
 
-
-void World::add_block(BlockType t, int x, int y, int z, std::map<std::string, unsigned int> map){
+void World::add_block(BlockType t, int x, int y, int z, std::map<std::string, unsigned int> map)
+{
     Block newBlock(t, x, y, z, map);
 
-
-
     BlocksToRender.push_back(newBlock);
+}
+
+void World::remove_block(int x, int y, int z)
+{
+
+    printf("removing for x: %d y: %d, z: %d  \n", x, y, z);
+
+    printf("removing blocks \n");
+
+    int length = BlocksToRender.size();
+
+    std::vector<Block> tmp;
+
+    for (int i = 0; i < length; i++)
+    {
+        Block b = BlocksToRender[i];
+
+        if (b.wordPos.x == x &&
+            b.wordPos.y == y &&
+            b.wordPos.z == z)
+        {
+        }
+        else
+        {
+            tmp.push_back(b);
+        }
+    }
+
+    BlocksToRender = tmp;
+
+
+    World::load_vertecies();
 }

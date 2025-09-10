@@ -93,7 +93,11 @@ public:
 
     const char *faceToString(BlockFace);
 
-    glm::vec3 place_block();
+    void interact_with_block(glm::vec3 *outVec, int *outInt);
+
+    void checkForBlockFacing();
+
+    glm::vec3 resolveCollision(glm::vec3 desiredPos, glm::vec3 oldPos);
 
     ~Camera();
 };
